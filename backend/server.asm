@@ -31,13 +31,26 @@ accept_loop:
     syscall
     mov r13, rax
 
-    ; open("index.html", O_RDONLY)
+    ; read request
+    mov rdi, r13
+    mov rsi, buffer
+    mov rdx, 1024
+    mov rax, 0
+    syscall
+    mov r15, rax
+
+    ; check if POST
+    mov eax, dword [buffer]
+    cmp eax, 0x54534f50     ; 'POST'
+    je handle_post
+
+    ; default: serve index.html
     mov rdi, path
     xor rsi, rsi
     mov rax, 2
     syscall
     cmp rax, 0
-    jl file_open_failed 
+    jl file_open_failed
     mov r14, rax
 
     ; send HTTP header
@@ -87,6 +100,72 @@ done_reading:
 
     jmp accept_loop
 
+handle_post:
+    ; find start of body (look for two consecutive LF characters)
+    mov rsi, buffer
+    mov rcx, r15
+find_body:
+    cmp rcx, 2
+    jbe no_body
+    mov al, [rsi]
+    cmp al, 10
+    jne next_char
+    mov al, [rsi+1]
+    cmp al, 10
+    jne next_char
+    add rsi, 2
+    sub rcx, 2
+    jmp body_found
+next_char:
+    inc rsi
+    dec rcx
+    jmp find_body
+no_body:
+    xor rcx, rcx
+body_found:
+    mov r8, rsi        ; message pointer
+    mov rdx, rcx       ; message length
+
+    ; open messages.txt for append
+    mov rdi, msg_path
+    mov rsi, 1089      ; O_WRONLY|O_CREAT|O_APPEND
+    mov rdx, 420       ; 0644 octal
+    mov rax, 2
+    syscall
+    mov r14, rax
+
+    ; write message
+    mov rdi, r14
+    mov rsi, r8
+    mov rdx, rcx
+    mov rax, 1
+    syscall
+
+    ; write newline
+    mov rdi, r14
+    mov rsi, newline
+    mov rdx, 1
+    mov rax, 1
+    syscall
+
+    ; close file
+    mov rdi, r14
+    mov rax, 3
+    syscall
+
+    ; send simple response
+    mov rdi, r13
+    mov rsi, post_resp
+    mov rdx, post_resp_len
+    mov rax, 1
+    syscall
+
+    mov rdi, r13
+    mov rax, 3
+    syscall
+
+    jmp accept_loop
+
 section .data
 address:
     dw 2                    ; AF_INET
@@ -109,5 +188,18 @@ fallback_msg:
     db 'Failed to open index.html', 10
 fall_back_msg_len equ $ - fallback_msg
 
+msg_path:
+    db 'messages.txt', 0
+
+post_resp:
+    db 'HTTP/1.1 200 OK', 13, 10
+    db 'Content-Type: text/plain', 13, 10
+    db 13, 10
+    db 'Message received', 10
+post_resp_len equ $ - post_resp
+newline:
+    db 10
+
 section .bss
+buffer resb 1024
 buffer2 resb 256
