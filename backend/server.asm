@@ -70,6 +70,12 @@ file_open_failed:
     mov rax, 1             ; syscall: write
     syscall
 
+    ; close client socket after sending error message
+    mov rdi, r13
+    mov rax, 3             ; close
+    syscall
+    jmp accept_loop
+
 read_loop:
     ; read from file
     mov rdi, r14
@@ -169,12 +175,13 @@ body_found:
 section .data
 address:
     dw 2                    ; AF_INET
-    dw 0x1F90 >> 8 | (0x1F90 << 8)               ; Port 8080 (big endian)
+    ; Port 8080 in network byte order
+    dw 0x901F               ; htons(8080)
     dd 0                    ; INADDR_ANY
     dq 0                    ; Padding
 
 path:
-    db 'index.html', 0
+    db 'frontend/index.html', 0
 
 http_header:
     db 'HTTP/1.1 200 OK', 13, 10
