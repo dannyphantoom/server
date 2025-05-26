@@ -1,0 +1,15 @@
+body{
+    font-family: sans-serif;
+    background: #1e1e2f;
+    color: #ffffff;
+    text-align: center;
+    padding: 50px;
+
+}
+
+.container {
+    background-color: #292b3e;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px #000;
+}
