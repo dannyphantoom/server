@@ -107,20 +107,26 @@ done_reading:
     jmp accept_loop
 
 handle_post:
-    ; find start of body (look for two consecutive LF characters)
+    ; find start of body (look for CRLF CRLF)
     mov rsi, buffer
     mov rcx, r15
 find_body:
-    cmp rcx, 2
-    jbe no_body
+    cmp rcx, 4
+    jb no_body
     mov al, [rsi]
-    cmp al, 10
+    cmp al, 13
     jne next_char
     mov al, [rsi+1]
     cmp al, 10
     jne next_char
-    add rsi, 2
-    sub rcx, 2
+    mov al, [rsi+2]
+    cmp al, 13
+    jne next_char
+    mov al, [rsi+3]
+    cmp al, 10
+    jne next_char
+    add rsi, 4
+    sub rcx, 4
     jmp body_found
 next_char:
     inc rsi
