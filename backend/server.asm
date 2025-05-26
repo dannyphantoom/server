@@ -247,32 +247,30 @@ post_body_found:
     mov r8, rsi        ; message pointer
     mov r9, rcx        ; preserve message length
 
-    ; open messages.txt for append
-    mov rdi, msg_path
-    mov rsi, 1089      ; O_WRONLY|O_CREAT|O_APPEND (0x441)
-    mov rdx, 0644o     ; 0644 octal file permissions
+    ; open named pipe (FIFO) for writing
+    mov rdi, fifo_pipe_path
+    mov rsi, 1         ; flags = O_WRONLY
+    ; rdx is not used for mode when opening an existing FIFO for writing only
     mov rax, 2         ; syscall: open
     syscall
-    ; TODO: Check open syscall result
-    mov r14, rax       ; file descriptor for messages.txt
+    ; TODO: Add error handling for FIFO open. If rax is negative, it failed.
+    ;       For now, we assume success and store the fd in r14.
+    ;       A robust solution would check rax and perhaps try to create the FIFO
+    ;       or log an error and send a different response to the client.
+    mov r14, rax       ; file descriptor for the FIFO
 
-    ; write message
-    mov rdi, r14
+    ; write message to FIFO
+    mov rdi, r14       ; FIFO fd
     mov rsi, r8
     mov rdx, r9
     mov rax, 1         ; syscall: write
     syscall
 
-    ; write newline
-    mov rdi, r14
+    ; write newline to FIFO
+    mov rdi, r14       ; FIFO fd
     mov rsi, newline_char
     mov rdx, 1
     mov rax, 1         ; syscall: write
-    syscall
-
-    ; close file
-    mov rdi, r14
-    mov rax, 3         ; syscall: close
     syscall
 
     ; send simple 200 OK response for POST
@@ -340,8 +338,11 @@ body_404:
     db '<html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p>The requested resource could not be found on this server.</p></body></html>', 0
 body_404_len equ $ - body_404 - 1
 
+fifo_pipe_path:
+    db '/tmp/assembly_chat_fifo', 0
+
 msg_path:
-    db 'messages.txt', 0
+    db 'messages.txt', 0 ; This is now unused for writing, kept for reference or other potential uses
 
 post_ok_response:
     db 'HTTP/1.1 200 OK', 13, 10
