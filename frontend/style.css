@@ -1,10 +1,14 @@
-body{
-    font-family: sans-serif;
+body {
+    font-family: Arial, sans-serif;
     background: #1e1e2f;
     color: #ffffff;
     text-align: center;
     padding: 50px;
-
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .container {
@@ -12,4 +16,29 @@ body{
     padding: 30px;
     border-radius: 10px;
     box-shadow: 0 0 15px #000;
+}
+
+.message-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+}
+
+.message-bar input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 5px;
+    border: none;
+}
+
+.message-bar button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #4caf50;
+    color: #fff;
+    border-radius: 5px;
+    cursor: pointer;
 }
