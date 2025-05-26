@@ -8,13 +8,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 FIFO_PATH = "/tmp/assembly_chat_fifo"
-DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
+DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_history.db")
 
 
 class ChatDatabase:
     """Simple wrapper around SQLite for storing chat messages."""
 
-    def __init__(self, path: str = DB_PATH):
+    def __init__(self, path: str = DATABASE_PATH):
         self.conn = sqlite3.connect(path)
         self._init_db()
 
@@ -25,7 +25,8 @@ class ChatDatabase:
                 CREATE TABLE IF NOT EXISTS messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
-                    message_content TEXT NOT NULL
+                    source TEXT DEFAULT 'Server',
+                    content TEXT NOT NULL
                 )
                 """
             )
@@ -33,14 +34,14 @@ class ChatDatabase:
     def add_message(self, timestamp: str, message: str) -> None:
         with self.conn:
             self.conn.execute(
-                "INSERT INTO messages(timestamp, message_content) VALUES(?, ?)",
-                (timestamp, message),
+                "INSERT INTO messages(timestamp, source, content) VALUES(?, ?, ?)",
+                (timestamp, "Server", message),
             )
 
     def get_all_messages(self):
         cur = self.conn.cursor()
         cur.execute(
-            "SELECT timestamp, message_content FROM messages ORDER BY id ASC"
+            "SELECT timestamp, source, content FROM messages ORDER BY id ASC"
         )
         return cur.fetchall()
 
@@ -107,7 +108,7 @@ class ChatApp(tk.Tk):
         self.text.configure(state=tk.DISABLED)
 
     def _load_history(self) -> None:
-        for ts, msg in self.db.get_all_messages():
+        for ts, src, msg in self.db.get_all_messages():
             self._append_message(ts, msg)
 
     def _clear_chat(self) -> None:
@@ -187,9 +188,120 @@ class ChatApp(tk.Tk):
         self.after(200, self.destroy)
 
 
+def init_db():
+    """Initializes the database and creates the messages table if it doesn't exist."""
+    db_dir = os.path.dirname(DATABASE_PATH)
+    if not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir)
+            print(f"Created directory for database: {db_dir}")
+        except OSError as e:
+            print(f"Error creating directory {db_dir}: {e}")
+            raise
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            source TEXT DEFAULT 'Server',
+            content TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    print(f"Database initialized/table ensured at {DATABASE_PATH}")
+    return conn
+
+def add_message_to_db(conn, timestamp, message_content, source='Server'):
+    """Adds a new message to the database."""
+    if conn is None:
+        print("Database connection is None. Cannot add message.")
+        return
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO messages (timestamp, source, content)
+            VALUES (?, ?, ?)
+        ''', (timestamp, source, message_content))
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database Error (add_message_to_db): {e}")
+
+def load_messages_from_db(conn, search_term=None, limit=None, offset=0):
+    """Loads messages from the database. 
+       Can filter by a search term (case-insensitive).
+       Can limit results and provide an offset for pagination.
+       Returns a list of dictionaries (for easier GUI use) or empty list on error.
+    """
+    if conn is None:
+        print("Database connection is None. Cannot load messages.")
+        return []
+        
+    cursor = conn.cursor()
+    query = "SELECT id, timestamp, source, content FROM messages"
+    params = []
+
+    if search_term:
+        query += " WHERE content LIKE ? ESCAPE '\\'" # Added ESCAPE for literal % and _ in search
+        # Sanitize search_term for LIKE: escape % and _
+        sanitized_search_term = search_term.replace('%', '\\%').replace('_', '\\_')
+        params.append(f"%{sanitized_search_term}%")
+    
+    query += " ORDER BY timestamp ASC" # Always sort by timestamp
+
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+        if offset > 0:
+            query += " OFFSET ?"
+            params.append(offset)
+
+    try:
+        cursor.execute(query, params)
+        messages = [
+            dict(zip([column[0] for column in cursor.description], row))
+            for row in cursor.fetchall()
+        ]
+        # print(f"Loaded {len(messages)} messages from DB. Search: '{search_term}', Limit: {limit}, Offset: {offset}") # Debug
+        return messages
+    except sqlite3.Error as e:
+        print(f"Database Error (load_messages_from_db): {e}")
+        return []
+
 def main() -> None:
-    app = ChatApp()
-    app.mainloop()
+    db_conn = None
+    try:
+        db_conn = init_db()
+        app = ChatApp()
+        app.mainloop()
+    except sqlite3.Error as e:
+        print(f"Database initialization error: {e}")
+        return # Exit if DB can't be initialized
+    except Exception as e:
+        print(f"An unexpected error occurred during setup: {e}")
+        if db_conn: db_conn.close()
+        return
+    
+    try:
+        while True:
+            # Open the FIFO. This will block until a writer (the server) opens it.
+            with open(FIFO_PATH, 'r') as fifo:
+                print(f"FIFO opened. Listening for messages...")
+    except FileNotFoundError:
+        print(f"Critical Error: Named pipe {FIFO_PATH} was not found or was deleted during operation.")
+        print("Please ensure the pipe exists and restart the application.")
+    except IOError as e:
+        print(f"IOError accessing FIFO: {e}")
+    except KeyboardInterrupt:
+        print("\nChat receiver stopped by user (Ctrl+C).")
+    finally:
+        # Note: The FIFO is not removed by this script automatically.
+        # This allows the server to continue trying to write to it if this app restarts.
+        # To fully clean up, manually remove /tmp/assembly_chat_fifo if desired.
+        print("Exiting chat app receiver.")
+        if db_conn: # Ensure db_conn was successfully assigned
+            db_conn.close()
+            print("Database connection closed.")
 
 
 if __name__ == "__main__":
