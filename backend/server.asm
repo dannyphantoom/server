@@ -44,28 +44,122 @@ accept_loop:
     cmp eax, 0x54534F50     ; 'POST'
     je handle_post
 
-    ; check if GET
+
+    ; ---- handle GET request ----
+    ; build full path into path_buf starting with frontend_dir
+    mov rdi, path_buf
+    mov rsi, frontend_dir
+    mov rcx, frontend_dir_len
+    cld
+    rep movsb
+    mov rbx, rdi               ; save pointer after prefix
+
+    ; rsi will point to requested path after "GET /"
+    lea rsi, [buffer+4]
+    cmp byte [rsi], '/'
+    jne use_index
+    inc rsi
+
+copy_path:
+    mov al, [rsi]
+    cmp al, ' '
+    je end_path_check
+    cmp al, 13
+    je end_path
+    cmp al, '?'
+    je end_path
+    mov [rdi], al
+    inc rdi
+    inc rsi
+    jmp copy_path
+
+end_path_check:
+    cmp rdi, rbx
+    jne end_path
+use_index:
+    mov rsi, index_file
+    mov rcx, index_file_len
+    rep movsb
+
+end_path:
+    mov byte [rdi], 0
+
+    ; determine content type based on file extension
+    mov rsi, rdi               ; rdi currently at null terminator
+    dec rsi
+find_dot:
+    cmp rsi, path_buf
+    jb no_ext
+    cmp byte [rsi], '.'
+    je got_ext
+    dec rsi
+    jmp find_dot
+
+no_ext:
+    mov rsi, http_header_html
+    mov rdx, http_header_html_len
+    jmp open_send
+
+got_ext:
+    inc rsi
+    mov al, [rsi]
+    cmp al, 'c'
+    jne check_js
+    cmp byte [rsi+1], 's'
+    jne check_js
+    cmp byte [rsi+2], 's'
+    jne check_js
+    cmp byte [rsi+3], 0
+    jne check_js
+    mov rsi, http_header_css
+    mov rdx, http_header_css_len
+    jmp open_send
+
+check_js:
+    mov al, [rsi]
+    cmp al, 'j'
+    jne use_html
+    cmp byte [rsi+1], 's'
+    jne use_html
+    cmp byte [rsi+2], 0
+    jne use_html
+    mov rsi, http_header_js
+    mov rdx, http_header_js_len
+    jmp open_send
+
+use_html:
+    mov rsi, http_header_html
+    mov rdx, http_header_html_len
+
+open_send:
+    mov r8, rsi               ; preserve header pointer
+    mov r9, rdx               ; preserve header length
+
+    mov rdi, path_buf
+
+; check if GET
     mov eax, dword [buffer]
     cmp eax, 0x20544547     ; 'GET '
     je handle_get
 
     ; default: serve index.html
     mov rdi, path
+
     xor rsi, rsi
+    xor rdx, rdx
     mov rax, 2
     syscall
     cmp rax, 0
     jl file_open_failed
     mov r14, rax
 
-    ; send HTTP header
     mov rdi, r13
-    mov rsi, http_header
-    mov rdx, http_header_len
+    mov rsi, r8
+    mov rdx, r9
     mov rax, 1
-    syscall
+    syscall                 ; write header
 
-    ;send file content
+    ; send file content
     jmp read_loop
 
 handle_get:
@@ -357,19 +451,37 @@ address:
     dd 0                    ; INADDR_ANY
     dq 0                    ; Padding
 
-path:
-    db 'frontend/index.html', 0
+frontend_dir:
+    db 'frontend/', 0
+frontend_dir_len equ $ - frontend_dir
 
-http_header:
+index_file:
+    db 'index.html', 0
+index_file_len equ $ - index_file
+
+http_header_html:
     db 'HTTP/1.1 200 OK', 13, 10
     db 'Content-Type: text/html', 13, 10
     db 13, 10
-http_header_len equ $ - http_header
+http_header_html_len equ $ - http_header_html
+
+http_header_css:
+    db 'HTTP/1.1 200 OK', 13, 10
+    db 'Content-Type: text/css', 13, 10
+    db 13, 10
+http_header_css_len equ $ - http_header_css
+
+http_header_js:
+    db 'HTTP/1.1 200 OK', 13, 10
+    db 'Content-Type: application/javascript', 13, 10
+    db 13, 10
+http_header_js_len equ $ - http_header_js
+
 fallback_msg:
     db 'File not found', 13, 10
     db 'Content-Type: text/plain', 13, 10
     db 13, 10
-    db 'Failed to open index.html', 10
+    db 'Failed to open file', 10
 fall_back_msg_len equ $ - fallback_msg
 
 msg_path:
@@ -403,3 +515,4 @@ type_header_len: dq 0
 section .bss
 buffer resb 1024
 buffer2 resb 256
+path_buf resb 256
