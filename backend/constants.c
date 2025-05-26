@@ -11,4 +11,4 @@ read = SYS_read;
 open = SYS_open;
 write = SYS_write;
 af_inet = AF_INET;
-sock_stream = SOCK_STREAM;
+sock_stream = 1; /* SOCK_STREAM */

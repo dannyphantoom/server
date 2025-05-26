@@ -143,7 +143,7 @@ open_send:
     je handle_get
 
     ; default: serve index.html
-    mov rdi, path
+    mov rdi, idx_path
 
     xor rsi, rsi
     xor rdx, rdx
@@ -342,19 +342,19 @@ map_path_to_file:
     push rdi
     mov al, [rsi]
     cmp al, '/'
-    jne not_root
+    jne .not_root
     mov rsi, idx_path
-    jmp copy_path
-not_root:
+    jmp .copy_loop
+.not_root:
     mov rsi, frontend_dir
     mov rcx, 0
-copy_path:
+.copy_loop:
     mov al, [rsi]
     mov [rdi], al
     inc rsi
     inc rdi
     cmp al, 0
-    jne copy_path
+    jne .copy_loop
     pop rdi
     pop rsi
     ret
@@ -497,8 +497,8 @@ newline:
     db 10
 
 req_path: times 256 db 0
-path_buf: times 256 db 0
-frontend_dir: db 'frontend', 0
+; path_buf allocated in .bss
+; frontend_dir string defined earlier
 idx_path: db 'frontend/index.html', 0
 s_html: db '.html', 0
 s_css: db '.css', 0
