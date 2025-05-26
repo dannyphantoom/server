@@ -25,6 +25,8 @@ body {
     transform: translateX(-50%);
     display: flex;
     gap: 10px;
+    width: 90%;
+    max-width: 800px;
 }
 
 .message-bar input {
@@ -41,4 +43,27 @@ body {
     color: #fff;
     border-radius: 5px;
     cursor: pointer;
+}
+
+.sent-message {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #4caf50;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 5px;
+    animation: flyUp 1s ease-out forwards;
+}
+
+@keyframes flyUp {
+    from {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -40px);
+    }
 }

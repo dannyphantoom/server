@@ -1,7 +1,3 @@
-function sayHello() {
-    alert("Hello, World!");
-}
-
 function sendMessage() {
     const input = document.getElementById('message-input');
     const message = input.value.trim();
@@ -12,8 +8,17 @@ function sendMessage() {
         headers: { 'Content-Type': 'text/plain' },
         body: message
     }).then(() => {
+        animateMessage(message);
         input.value = '';
     }).catch(err => {
         console.error(err);
     });
+}
+
+function animateMessage(text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'sent-message';
+    msgDiv.textContent = text;
+    document.body.appendChild(msgDiv);
+    msgDiv.addEventListener('animationend', () => msgDiv.remove());
 }
