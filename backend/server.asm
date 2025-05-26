@@ -41,7 +41,7 @@ accept_loop:
 
     ; check if POST
     mov eax, dword [buffer]
-    cmp eax, 0x54534f50     ; 'POST'
+    cmp eax, 0x54534F50     ; 'POST'
     je handle_post
 
     ; default: serve index.html
@@ -133,7 +133,9 @@ next_char:
     dec rcx
     jmp find_body
 no_body:
-    xor rcx, rcx
+    ; If no CRLF CRLF found, treat entire buffer as body
+    mov rsi, buffer
+    mov rcx, r15
 body_found:
     mov r8, rsi        ; message pointer
     mov r9, rcx        ; preserve message length
