@@ -1,6 +1,6 @@
 body {
-    font-family: Arial, sans-serif;
-    background: #1e1e2f;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #2c3e50, #1c1c1c);
     color: #ffffff;
     text-align: center;
     padding: 50px;
@@ -12,21 +12,21 @@ body {
 }
 
 .container {
-    background-color: #292b3e;
+    background-color: rgba(41, 43, 62, 0.9);
     padding: 30px;
     border-radius: 10px;
-    box-shadow: 0 0 15px #000;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .message-bar {
     position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 0;
+    left: 0;
+    width: 100%;
     display: flex;
     gap: 10px;
-    width: 90%;
-    max-width: 800px;
+    padding: 20px;
+    background-color: rgba(41, 43, 62, 0.9);
 }
 
 .message-bar input {
@@ -34,6 +34,7 @@ body {
     padding: 10px;
     border-radius: 5px;
     border: none;
+    font-size: 16px;
 }
 
 .message-bar button {
@@ -43,6 +44,11 @@ body {
     color: #fff;
     border-radius: 5px;
     cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.message-bar button:hover {
+    background-color: #43a047;
 }
 
 .sent-message {
@@ -54,16 +60,16 @@ body {
     color: #fff;
     padding: 8px 12px;
     border-radius: 5px;
-    animation: flyUp 1s ease-out forwards;
+    animation: sendOff 1s ease-out forwards;
 }
 
-@keyframes flyUp {
+@keyframes sendOff {
     from {
         opacity: 1;
         transform: translate(-50%, 0);
     }
     to {
         opacity: 0;
-        transform: translate(-50%, -40px);
+        transform: translate(calc(50vw - 50%), -100vh) scale(0.5);
     }
 }
