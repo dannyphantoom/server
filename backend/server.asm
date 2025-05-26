@@ -136,7 +136,7 @@ no_body:
     xor rcx, rcx
 body_found:
     mov r8, rsi        ; message pointer
-    mov rdx, rcx       ; message length
+    mov r9, rcx        ; preserve message length
 
     ; open messages.txt for append
     mov rdi, msg_path
@@ -149,7 +149,7 @@ body_found:
     ; write message
     mov rdi, r14
     mov rsi, r8
-    mov rdx, rcx
+    mov rdx, r9
     mov rax, 1
     syscall
 
