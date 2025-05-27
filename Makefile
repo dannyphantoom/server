@@ -21,7 +21,7 @@ clean:
 # This script will be piped to /bin/sh
 define RUN_SCRIPT
 set -e;
-PID_PYTHON=''; # Use single quotes for shell, make will pass them through echo.
+PID_PYTHON='';
 
 # Trap for INT signal
 trap ' \
@@ -65,7 +65,7 @@ echo "Starting assembly server in the foreground (requires sudo)...";
 sudo ./server;
 SERVER_EXIT_CODE=$$?;
 echo "Assembly server has finished with exit code $$SERVER_EXIT_CODE.";
-PID_PYTHON=''; # Clear PID before final exit to avoid issues if EXIT trap reruns on this exit
+PID_PYTHON=''; 
 exit $$SERVER_EXIT_CODE
 endef
 
