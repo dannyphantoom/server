@@ -1,83 +1,39 @@
+# Build directory
+BUILD_DIR = build
+
 # Default target
 all: constants build
 
 # Generate constants.txt from preprocessed constants.c
-constants:
-	$(info --- Generating constants.txt ---)
-	@gcc -E -P backend/constants.c > constants.txt
+constants: $(BUILD_DIR)/constants.txt
+
+$(BUILD_DIR)/constants.txt: backend/constants.c | $(BUILD_DIR)
+	$(info --- Generating $(BUILD_DIR)/constants.txt ---)
+	@gcc -E -P backend/constants.c > $(BUILD_DIR)/constants.txt
 
 # Assemble and link the server
-build:
-	$(info --- Assembling and linking server ---)
-	@nasm -f elf64 backend/server.asm -o server.o
-	@ld server.o -o server
+build: $(BUILD_DIR)/server
+
+$(BUILD_DIR)/server: $(BUILD_DIR)/server.o | $(BUILD_DIR)
+	$(info --- Linking $(BUILD_DIR)/server ---)
+	@ld $(BUILD_DIR)/server.o -o $(BUILD_DIR)/server
+
+$(BUILD_DIR)/server.o: backend/server.asm | $(BUILD_DIR)
+	$(info --- Assembling backend/server.asm to $(BUILD_DIR)/server.o ---)
+	@nasm -f elf64 backend/server.asm -o $(BUILD_DIR)/server.o
+
+# Target to create the build directory
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
 
 # Clean up build artifacts
 clean:
-	$(info --- Cleaning build artifacts ---)
-	@rm -f server server.o constants.txt
+	$(info --- Cleaning contents of $(BUILD_DIR) ---)
+	@-find $(BUILD_DIR)/ -mindepth 1 -delete
 
-# Define the script for the run target
-# This script will be piped to /bin/sh
-define RUN_SCRIPT
-set -e;
-PID_PYTHON='';
-
-# Trap for INT signal
-trap ' \
-    echo; \
-    echo "INFO: Trap caught (signal: INT), cleaning up Python app (PID $$PID_PYTHON)."; \
-    if [ -n "$$PID_PYTHON" ]; then \
-        kill "$$PID_PYTHON" 2>/dev/null || echo "Python app (PID $$PID_PYTHON) already stopped or not found."; \
-        echo "Python app cleanup for INT attempted."; \
-    fi; \
-    exit 130; \
-' INT;
-
-# Trap for TERM signal
-trap ' \
-    echo; \
-    echo "INFO: Trap caught (signal: TERM), cleaning up Python app (PID $$PID_PYTHON)."; \
-    if [ -n "$$PID_PYTHON" ]; then \
-        kill "$$PID_PYTHON" 2>/dev/null || echo "Python app (PID $$PID_PYTHON) already stopped or not found."; \
-        echo "Python app cleanup for TERM attempted."; \
-    fi; \
-    exit 130; \
-' TERM;
-
-# Trap for EXIT signal
-trap ' \
-    echo; \
-    echo "INFO: Trap caught (signal: EXIT), cleaning up Python app (PID $$PID_PYTHON)."; \
-    if [ -n "$$PID_PYTHON" ]; then \
-        kill "$$PID_PYTHON" 2>/dev/null || echo "Python app (PID $$PID_PYTHON) already stopped or not found on EXIT."; \
-        echo "Python app cleanup for EXIT attempted."; \
-    fi; \
-' EXIT;
-
-echo "Starting user-space chat app in the background...";
-python userspace_chat_app/chat_app_receiver.py & \
-PID_PYTHON=$$!;
-echo "User-space chat app started with PID $$PID_PYTHON.";
-echo "Waiting 2 seconds for the chat app to initialize FIFO...";
-sleep 2;
-echo "Starting assembly server in the foreground (requires sudo)...";
-sudo ./server;
-SERVER_EXIT_CODE=$$?;
-echo "Assembly server has finished with exit code $$SERVER_EXIT_CODE.";
-PID_PYTHON=''; 
-exit $$SERVER_EXIT_CODE
-endef
-
-# Run both the user-space app (background) and the server (foreground)
+# Run the services using the dedicated shell script
 run: all
-	$(info --- Preparing to run services by piping script to sh ---)
-	@echo "$(RUN_SCRIPT)" | /bin/sh
-
-# A target to stop the backgrounded python app if needed, though trap should handle it.
-# This is a bit more involved to do reliably from a separate make target without PID files.
-# stop_chat_app:
-# 	@echo "Attempting to stop user-space chat app..."
-# 	@pkill -f "python userspace_chat_app/chat_app_receiver.py" || echo "Chat app not found or already stopped."
+	$(info --- Executing run.sh script ---)
+	@sudo $(CURDIR)/run.sh
 
 .PHONY: all constants build clean run
