@@ -53,7 +53,7 @@ endef
 # Run both the user-space app (background) and the server (foreground)
 run: all
 	$(info --- Preparing to run services ---)
-	@/bin/sh -c '$(RUN_SCRIPT)'
+	@/bin/sh -c "$(RUN_SCRIPT)"
 
 # A target to stop the backgrounded python app if needed, though trap should handle it.
 # This is a bit more involved to do reliably from a separate make target without PID files.
